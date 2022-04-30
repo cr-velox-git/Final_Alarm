@@ -9,6 +9,8 @@ import android.view.View
 import android.view.Window
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.MutableLiveData
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import com.intealth.finalalarm.databinding.ActivityMainBinding
@@ -21,7 +23,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var addAlarmDialog: Dialog
     private var picker: MaterialTimePicker? = null
     private var calendar: Calendar? = null
-    var alarmDataList: List<AlarmData> = ArrayList()
+    var alarmDataList: MutableLiveData<List<AlarmData>> = MutableLiveData()
     lateinit var database: AlarmRoomDB
     var TAG: String = "Main Activity"
     private var manager: AlarmManager? = null
@@ -36,13 +38,24 @@ class MainActivity : AppCompatActivity() {
 
         //Initialize database
         database = AlarmRoomDB.getInstance(this)
+        Thread(Runnable {
+            alarmDataList.postValue(database.alarmDao().all)
+        }).start()
         database.alarmDao().all
+
 
         //Add alarm function
         addAlarmDialog()
 
         //set up the recycle view
+        val manager = LinearLayoutManager(this)
+        manager.orientation = LinearLayoutManager.VERTICAL
+        binding.alarmRecycleView.layoutManager = manager
 
+        alarmDataList.observe(this , androidx.lifecycle.Observer {
+            val adapter = alarmDataList.value?.let { it1 -> AlarmAdapter(it1) };
+            binding.alarmRecycleView.adapter = adapter
+        })
 
         binding.addAlarm.setOnClickListener {
             addAlarmDialog.show()
@@ -166,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra("DES", name)
         intent.putExtra("NOTIFICATION_ID", frequency)
         val pendingIntent =
-            PendingIntent.getBroadcast(this@MainActivity, 0, intent, PendingIntent.FLAG_MUTABLE)
+            PendingIntent.getBroadcast(this@MainActivity, 0, intent, PendingIntent.FLAG_IMMUTABLE)
 
         manager!!.setRepeating(
             AlarmManager.RTC_WAKEUP,
@@ -176,8 +189,6 @@ class MainActivity : AppCompatActivity() {
         )
 
         //manager!!.setInexactRepeating(AlarmManager.RTC_WAKEUP,millis,frequency,pendingIntent)
-
-
 
 
         return true
